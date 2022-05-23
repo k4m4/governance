@@ -1,12 +1,17 @@
 import chai, { expect } from 'chai'
-import { Contract, constants } from 'ethers'
-import { solidity, MockProvider, createFixtureLoader, deployContract } from 'ethereum-waffle'
+import { artifacts, ethers, waffle } from 'hardhat'
+import type { Artifact } from 'hardhat/types'
+const { Contract, constants } = ethers
+import type { Contract as ContractType, constants as constantsType } from 'ethers'
+const { solidity, createFixtureLoader, deployContract } = waffle
+import { MockProvider } from 'ethereum-waffle'
+import type { Wallet } from 'ethers'
 
 import UniswapV2Factory from '@uniswap/v2-core/build/UniswapV2Factory.json'
 import UniswapV2Pair from '@uniswap/v2-core/build/UniswapV2Pair.json'
-import FeeToSetter from '../../build/FeeToSetter.json'
-import FeeTo from '../../build/FeeTo.json'
-import Uni from '../../build/Uni.json'
+//import FeeToSetter from '../../build/FeeToSetter.json'
+//import FeeTo from '../../build/FeeTo.json'
+//import Uni from '../../build/Uni.json'
 
 import { governanceFixture } from '../fixtures'
 import { mineBlock, expandTo18Decimals } from '../utils'
@@ -14,37 +19,38 @@ import { mineBlock, expandTo18Decimals } from '../utils'
 chai.use(solidity)
 
 describe('scenario:FeeTo', () => {
-  const provider = new MockProvider({
-    ganacheOptions: {
-      hardfork: 'istanbul',
-      mnemonic: 'horn horn horn horn horn horn horn horn horn horn horn horn',
-      gasLimit: 9999999,
-    },
-  })
+  const provider = waffle.provider
   const [wallet, other] = provider.getWallets()
   const loadFixture = createFixtureLoader([wallet], provider)
 
   beforeEach(async () => {
+    // @ts-ignore
     await loadFixture(governanceFixture)
   })
 
-  let factory: Contract
+  let factory: ContractType
   beforeEach('deploy uniswap v2', async () => {
+    //const UniswapV2Factory: Artifact = await artifacts.readArtifact("UniswapV2Factory");
+    // @ts-ignore
     factory = await deployContract(wallet, UniswapV2Factory, [wallet.address])
   })
 
-  let feeToSetter: Contract
+  let feeToSetter: ContractType
   let vestingEnd: number
-  let feeTo: Contract
+  let feeTo: ContractType
   beforeEach('deploy feeToSetter vesting contract', async () => {
     // deploy feeTo
     // constructor arg should be timelock, just mocking for testing purposes
+    const FeeTo: Artifact = await artifacts.readArtifact("FeeTo");
+    // @ts-ignore
     feeTo = await deployContract(wallet, FeeTo, [wallet.address])
 
     const { timestamp: now } = await provider.getBlock('latest')
     vestingEnd = now + 60
     // 3rd constructor arg should be timelock, just mocking for testing purposes
     // 4th constructor arg should be feeTo, just mocking for testing purposes
+    const FeeToSetter: Artifact = await artifacts.readArtifact("FeeToSetter");
+    // @ts-ignore
     feeToSetter = await deployContract(wallet, FeeToSetter, [
       factory.address,
       vestingEnd,
@@ -55,28 +61,34 @@ describe('scenario:FeeTo', () => {
     // set feeToSetter to be the vesting contract
     await factory.setFeeToSetter(feeToSetter.address)
 
+    // @ts-ignore
     await mineBlock(provider, vestingEnd)
   })
 
   it('permissions', async () => {
+    // @ts-ignore
     await expect(feeTo.connect(other).setOwner(other.address)).to.be.revertedWith('FeeTo::setOwner: not allowed')
 
+    // @ts-ignore
     await expect(feeTo.connect(other).setFeeRecipient(other.address)).to.be.revertedWith(
       'FeeTo::setFeeRecipient: not allowed'
     )
   })
 
   describe('tokens', () => {
-    const tokens: Contract[] = []
+    const tokens: ContractType[] = []
     beforeEach('make test tokens', async () => {
+      const Uni: Artifact = await artifacts.readArtifact("Uni");
       const { timestamp: now } = await provider.getBlock('latest')
+      // @ts-ignore
       const token0 = await deployContract(wallet, Uni, [wallet.address, constants.AddressZero, now + 60 * 60])
       tokens.push(token0)
+      // @ts-ignore
       const token1 = await deployContract(wallet, Uni, [wallet.address, constants.AddressZero, now + 60 * 60])
       tokens.push(token1)
     })
 
-    let pair: Contract
+    let pair: ContractType
     beforeEach('create fee liquidity', async () => {
       // turn the fee on
       await feeToSetter.toggleFees(true)
@@ -84,6 +96,8 @@ describe('scenario:FeeTo', () => {
       // create the pair
       await factory.createPair(tokens[0].address, tokens[1].address)
       const pairAddress = await factory.getPair(tokens[0].address, tokens[1].address)
+      //const UniswapV2Pair: Artifact = await artifacts.readArtifact("UniswapV2Pair");
+      // @ts-ignore
       pair = new Contract(pairAddress, UniswapV2Pair.abi).connect(wallet)
 
       // add liquidity

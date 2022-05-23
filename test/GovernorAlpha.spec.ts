@@ -1,6 +1,12 @@
 import chai, { expect } from 'chai'
-import { Contract, constants } from 'ethers'
-import { solidity, MockProvider, createFixtureLoader } from 'ethereum-waffle'
+import { ethers, waffle } from 'hardhat'
+const { Contract, constants } = ethers
+import type { Wallet as WalletType, Contract as ContractType, constants as constantsType } from 'ethers'
+const { loadFixture, solidity, createFixtureLoader } = waffle
+import { MockProvider } from 'ethereum-waffle'
+import type { MockProvider as MockProviderType } from 'ethereum-waffle'
+
+export type Fixture<T> = (wallets: WalletType[], provider: MockProviderType) => Promise<T>;
 
 import { governanceFixture } from './fixtures'
 import { DELAY } from './utils'
@@ -8,21 +14,16 @@ import { DELAY } from './utils'
 chai.use(solidity)
 
 describe('GovernorAlpha', () => {
-  const provider = new MockProvider({
-    ganacheOptions: {
-      hardfork: 'istanbul',
-      mnemonic: 'horn horn horn horn horn horn horn horn horn horn horn horn',
-      gasLimit: 9999999,
-    },
-  })
+  const provider = waffle.provider
   const [wallet] = provider.getWallets()
   const loadFixture = createFixtureLoader([wallet], provider)
 
-  let uni: Contract
-  let timelock: Contract
-  let governorAlpha: Contract
+  let uni: ContractType
+  let timelock: ContractType
+  let governorAlpha: ContractType
   beforeEach(async () => {
-    const fixture = await loadFixture(governanceFixture)
+    // @ts-ignore
+    const fixture = await loadFixture(governanceFixture as Fixture<GovernanceFixture>)
     uni = fixture.uni
     timelock = fixture.timelock
     governorAlpha = fixture.governorAlpha

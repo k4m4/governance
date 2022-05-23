@@ -1,12 +1,16 @@
 import chai, { expect } from 'chai'
-import { BigNumber, Contract, constants, utils } from 'ethers'
-import { solidity, MockProvider, createFixtureLoader, deployContract } from 'ethereum-waffle'
+import { artifacts, ethers, waffle } from 'hardhat'
+import type { Artifact } from 'hardhat/types'
+const { BigNumber, Contract, constants, utils } = ethers
+import type { BigNumber as BigNumberType, Contract as ContractType } from 'ethers'
+const { solidity, createFixtureLoader, deployContract } = waffle
+import { MockProvider } from 'ethereum-waffle'
 import { ecsign } from 'ethereumjs-util'
 
 import { governanceFixture } from './fixtures'
 import { expandTo18Decimals, mineBlock } from './utils'
 
-import Uni from '../build/Uni.json'
+//import Uni from '../build/Uni.json'
 
 chai.use(solidity)
 
@@ -19,18 +23,13 @@ const PERMIT_TYPEHASH = utils.keccak256(
 )
 
 describe('Uni', () => {
-  const provider = new MockProvider({
-    ganacheOptions: {
-      hardfork: 'istanbul',
-      mnemonic: 'horn horn horn horn horn horn horn horn horn horn horn horn',
-      gasLimit: 9999999,
-    },
-  })
+  const provider = waffle.provider
   const [wallet, other0, other1] = provider.getWallets()
   const loadFixture = createFixtureLoader([wallet], provider)
 
-  let uni: Contract
+  let uni: ContractType
   beforeEach(async () => {
+    // @ts-ignore
     const fixture = await loadFixture(governanceFixture)
     uni = fixture.uni
   })
@@ -71,6 +70,7 @@ describe('Uni', () => {
     expect(await uni.allowance(owner, spender)).to.eq(value)
     expect(await uni.nonces(owner)).to.eq(1)
 
+    // @ts-ignore
     await uni.connect(other0).transferFrom(owner, spender, value)
   })
 
@@ -83,14 +83,17 @@ describe('Uni', () => {
     expect(currectVotes0).to.be.eq(0)
     expect(currectVotes1).to.be.eq(0)
 
+    // @ts-ignore
     await uni.connect(other0).delegate(other1.address)
     currectVotes1 = await uni.getCurrentVotes(other1.address)
     expect(currectVotes1).to.be.eq(expandTo18Decimals(1))
 
+    // @ts-ignore
     await uni.connect(other1).delegate(other1.address)
     currectVotes1 = await uni.getCurrentVotes(other1.address)
     expect(currectVotes1).to.be.eq(expandTo18Decimals(1).add(expandTo18Decimals(2)))
 
+    // @ts-ignore
     await uni.connect(other1).delegate(wallet.address)
     currectVotes1 = await uni.getCurrentVotes(other1.address)
     expect(currectVotes1).to.be.eq(expandTo18Decimals(1))
@@ -98,14 +101,18 @@ describe('Uni', () => {
 
   it('mints', async () => {
     const { timestamp: now } = await provider.getBlock('latest')
+    const Uni: Artifact = await artifacts.readArtifact("Uni")
+    // @ts-ignore
     const uni = await deployContract(wallet, Uni, [wallet.address, wallet.address, now + 60 * 60])
     const supply = await uni.totalSupply()
 
     await expect(uni.mint(wallet.address, 1)).to.be.revertedWith('Uni::mint: minting not allowed yet')
 
     let timestamp = await uni.mintingAllowedAfter()
+    // @ts-ignore
     await mineBlock(provider, timestamp.toString())
 
+    // @ts-ignore
     await expect(uni.connect(other1).mint(other1.address, 1)).to.be.revertedWith('Uni::mint: only the minter can mint')
     await expect(uni.mint('0x0000000000000000000000000000000000000000', 1)).to.be.revertedWith('Uni::mint: cannot transfer to the zero address')
 
@@ -116,6 +123,7 @@ describe('Uni', () => {
     expect(await uni.balanceOf(wallet.address)).to.be.eq(supply.add(amount))
 
     timestamp = await uni.mintingAllowedAfter()
+    // @ts-ignore
     await mineBlock(provider, timestamp.toString())
     // cannot mint 2.01%
     await expect(uni.mint(wallet.address, supply.mul(mintCap.add(1)))).to.be.revertedWith('Uni::mint: exceeded mint cap')
